@@ -43,7 +43,7 @@ See [`docs/architecture.md`](docs/architecture.md) for details.
 ### Option A — Docker (recommended)
 
 ```bash
-git clone https://github.com/<your-username>/emergency-response-system.git
+git clone https://github.com/BOT9315/emergency-response-system.git
 cd emergency-response-system
 docker compose up --build
 ```
