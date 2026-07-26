@@ -1,91 +1,69 @@
 # IERCS — Intelligent Emergency Response Coordination System
 
-An AI-powered platform that takes a free-text emergency report, automatically
-classifies its type and severity, computes a dispatch priority, and
-recommends (or auto-assigns) the nearest suitable responder unit — with a
-real-time command console dashboard, live map, fleet management, and
-analytics.
+A full-stack reference application for coordinating emergency responders. Report an incident in plain language, and an AI layer classifies it, scores its priority, and helps dispatch the nearest suitable unit — all synced live across a command console dashboard.
 
-> Full architecture and AI algorithm details: [`docs/architecture.md`](docs/architecture.md)
+![status](https://img.shields.io/badge/status-demo-blue) ![python](https://img.shields.io/badge/python-3.10%2B-blue) ![node](https://img.shields.io/badge/node-18%2B-green) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Features
+---
 
-- **AI incident triage** — TF-IDF + Naive Bayes text classifier decides
-  incident type (fire, medical, crime, accident, natural disaster, hazmat,
-  other) and severity (low/moderate/high/critical) from a free-text report,
-  with a safety-critical keyword override.
-- **Multi-factor priority scoring** — 0-100 dispatch priority combining
-  severity, casualties, incident-type risk, location risk, and wait time.
-- **AI dispatch optimizer** — nearest-suitable-unit matching by real
-  distance/ETA, plus one-click batch auto-dispatch for a whole backlog.
-- **Predictive hotspots** — recency- and severity-weighted density map of
-  where incidents are clustering, for proactive pre-positioning.
-- **Real-time dashboard** — live incident queue, map (Leaflet), fleet
-  status, and analytics (Recharts), synced over WebSocket.
-- **Full REST API** with JWT auth, OpenAPI docs at `/docs`.
+## What it does
 
-## Project structure
+- **Free-text triage** — type a description like *"car crash on the highway, two people injured"* and the AI classifier (TF-IDF + Naive Bayes) predicts incident **type** (fire, medical, crime, accident, natural disaster, hazmat, other) and **severity** (low / moderate / high / critical).
+- **Priority scoring** — a 0–100 score computed from severity, casualties, incident-type risk, location risk, and wait time.
+- **AI dispatch** — the optimizer matches each incident to the nearest suitable responder unit, either one at a time or as a one-click "clear the queue" batch action.
+- **Live command console** — a dashboard with a map (incident + unit markers), a live incident feed, fleet status, and analytics — all pushed in real time over WebSocket.
+
+## Tech stack
+
+| Layer | Stack |
+|---|---|
+| Backend | Python, FastAPI, SQLAlchemy + SQLite, scikit-learn, JWT auth, WebSockets |
+| Frontend | React, Vite, Leaflet (maps), Recharts (analytics) |
+| Deployment | Docker Compose |
+
+## Architecture
 
 ```
-emergency-response-system/
-├── backend/                 FastAPI application
-│   ├── app/
-│   │   ├── ai/               classifier, dispatch optimizer, predictor
-│   │   ├── routers/          incidents, units, dispatch, analytics, auth
-│   │   ├── models.py         SQLAlchemy ORM models
-│   │   ├── schemas.py        Pydantic request/response schemas
-│   │   ├── security.py       JWT + password hashing
-│   │   ├── websocket_manager.py
-│   │   ├── seed_data.py      demo units + historical incidents
-│   │   ├── config.py         all tunable weights/constants
-│   │   └── main.py           app entrypoint
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/                 React + Vite dashboard
-│   ├── src/
-│   │   ├── components/       Navbar, Dashboard, MapView, IncidentFeed,
-│   │   │                     ReportIncident, ResourcePanel, Analytics
-│   │   ├── api.js             REST + WebSocket client
-│   │   ├── utils.js
-│   │   └── App.jsx
-│   ├── package.json
-│   └── Dockerfile
-├── docs/
-│   └── architecture.md
-└── docker-compose.yml
+┌──────────────┐     REST /api/...      ┌───────────────┐
+│   Frontend   │ ─────────────────────► │    Backend    │
+│ React + Vite │ ◄───────────────────── │    FastAPI    │
+│   :5173      │     WebSocket /ws/live │     :8000     │
+└──────────────┘ ◄────────────────────► └───────┬───────┘
+                                                  │
+                                                  ▼
+                                         ┌─────────────────┐
+                                         │  SQLite database │
+                                         └─────────────────┘
 ```
 
-## Quick start — Docker (recommended)
+See [`docs/architecture.md`](docs/architecture.md) for details.
+
+## Getting started
+
+### Option A — Docker (recommended)
 
 ```bash
+git clone https://github.com/<your-username>/emergency-response-system.git
+cd emergency-response-system
 docker compose up --build
 ```
 
 - Dashboard: http://localhost:3000
-- API + docs: http://localhost:8000/docs
+- API docs (Swagger): http://localhost:8000/docs
 
-## Quick start — manual
+### Option B — Run manually
 
-### Backend
+**Backend**
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-The database (SQLite) and demo data (13 responder units + ~2 weeks of
-sample incident history) are created automatically on first run. Two demo
-accounts are seeded:
-
-| Username     | Password     | Role       |
-|--------------|--------------|------------|
-| `admin`      | `admin123`   | admin      |
-| `dispatcher1`| `dispatch123`| dispatcher |
-
-### Frontend
+**Frontend** (in a separate terminal)
 
 ```bash
 cd frontend
@@ -93,61 +71,56 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — the Vite dev server proxies `/api` and `/ws`
-to `localhost:8000`, so run the backend first.
+Then open http://localhost:5173. The Vite dev server proxies `/api` and `/ws` requests to the backend, so start the backend first.
 
-## Using the system
+### Demo login
 
-1. Open the dashboard and click **+ Report Incident**. Describe a situation
-   in your own words (e.g. "car crash on the highway, two people injured")
-   — the AI engine classifies type/severity and shows you the computed
-   priority instantly.
-2. The incident appears in the live queue, color-coded by severity, and as
-   a marker on the map.
-3. Click **Dispatch** on any triaged incident to let the AI pick the
-   nearest suitable unit, or use **AI Auto-Dispatch** to clear the entire
-   pending queue in one pass (useful right after a surge of reports).
-4. Check the **Fleet** tab for unit status, and **Analytics** for system-wide
-   stats, a 14-day incident timeline, and the incident-type breakdown.
+| Role | Username | Password |
+|---|---|---|
+| Admin | `admin` | `admin123` |
+| Dispatcher | `dispatcher1` | `dispatch123` |
 
-## Configuration
+## API overview
 
-All AI weights, unit-routing rules, and tunables live in
-`backend/app/config.py` — no code changes needed elsewhere to retune the
-system (e.g. give casualties more weight in the priority formula, or add a
-new incident category).
+All endpoints are served under `/api`, with interactive docs at `/docs`.
 
-Environment variables (optional):
+| Prefix | Purpose |
+|---|---|
+| `/api/auth` | Login, JWT tokens |
+| `/api/incidents` | Create, list, update incidents |
+| `/api/units` | Manage responder units |
+| `/api/dispatch` | Assign units, auto-dispatch |
+| `/api/analytics` | Stats, hotspots, timelines |
+| `/ws/live` | WebSocket — live push updates |
 
-- `IERCS_SECRET_KEY` — JWT signing secret (set a real one in production)
-- `IERCS_DATABASE_URL` — defaults to local SQLite; point at Postgres etc. by
-  changing this
+## Project structure
 
-## API reference
+```
+emergency-response-system/
+├── backend/
+│   ├── app/
+│   │   ├── main.py            # FastAPI app, router registration, startup seeding
+│   │   ├── models.py          # SQLAlchemy models
+│   │   ├── database.py        # DB connection
+│   │   ├── websocket_manager.py
+│   │   ├── routers/           # incidents, resources, dispatch, analytics, auth
+│   │   └── ai/                # classifier, dispatch optimizer, hotspot predictor
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx            # top-level state, WebSocket connection
+│   │   ├── api.js             # all backend calls live here
+│   │   └── components/        # Dashboard, MapView, IncidentFeed, ResourcePanel, Analytics...
+│   └── package.json
+├── docs/architecture.md
+├── docker-compose.yml
+└── README.md
+```
 
-Full interactive OpenAPI docs are served at `/docs` once the backend is
-running. Key endpoints:
+## Notes
 
-| Method | Path                             | Purpose                          |
-|--------|-----------------------------------|-----------------------------------|
-| POST   | `/api/incidents`                  | Report + AI-triage an incident    |
-| GET    | `/api/incidents`                  | List incidents (priority sorted)  |
-| GET    | `/api/incidents/{id}/suggested-units` | Ranked AI unit recommendations |
-| PATCH  | `/api/incidents/{id}/status`      | Update incident lifecycle status  |
-| POST   | `/api/dispatch/assign`            | Assign a unit (AI or manual)      |
-| POST   | `/api/dispatch/auto-optimize`     | Batch-dispatch the whole queue    |
-| GET    | `/api/analytics/stats`            | System-wide stats                 |
-| GET    | `/api/analytics/hotspots`         | AI-predicted incident hotspots    |
-| GET    | `/api/analytics/timeline`         | Incidents/day by severity         |
-| WS     | `/ws/live`                        | Real-time event stream            |
+This is a reference implementation meant to demonstrate the full pipeline (triage → prioritize → dispatch → live coordination → analytics) end to end. For production use you'd want a managed database, a real routing/ETA provider, SMS/voice intake, and hardened auth/secrets management.
 
-## Notes on scope
+## License
 
-This is a complete, runnable reference implementation intended to
-demonstrate the full architecture end-to-end (AI triage → prioritization →
-optimized dispatch → real-time coordination → analytics). For a production
-deployment you would additionally want: a managed database with backups,
-HTTPS/production JWT secret management, a real turn-by-turn routing
-provider for ETA, SMS/phone intake integration, and role-based UI gating
-per user (currently the dashboard itself is open; the API already enforces
-JWT roles on write operations that need them).
+MIT — see [LICENSE](LICENSE) for details.
