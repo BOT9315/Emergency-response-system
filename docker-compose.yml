@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: iercs-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - IERCS_SECRET_KEY=change-this-in-production
+      - IERCS_DATABASE_URL=sqlite:///./iercs.db
+    volumes:
+      - iercs-data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: iercs-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  iercs-data:
